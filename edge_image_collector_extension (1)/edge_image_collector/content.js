@@ -1,92 +1,141 @@
 (() => {
-  if (window.__imageCollectorInstalled) return;
-  window.__imageCollectorInstalled = true;
+  if (window.imageCollectorInstalled) return;
 
-  const found = new Map();
+  window.imageCollectorInstalled = true;
 
-  function bestSrcset(srcset) {
-    if (!srcset) return "";
-    const choices = srcset.split(",").map(s => s.trim()).filter(Boolean);
-    if (!choices.length) return "";
-    // Prefer the candidate with the largest declared width/density.
-    choices.sort((a, b) => {
-      const score = s => {
-        const m = s.match(/([\d.]+)(w|x)$/);
-        return m ? Number(m[1]) * (m[2] === "x" ? 1000 : 1) : 0;
-      };
-      return score(a) - score(b);
-    });
-    return choices[choices.length - 1].split(/\s+/)[0];
-  }
+  const images = new Map();
 
-  function add(url, img) {
-    if (!url || /^(data:|blob:|javascript:)/i.test(url)) return;
+  function addImage(url, img) {
+    if (!url) return;
+
+    if (
+      url.startsWith("data:") ||
+      url.startsWith("blob:")
+    ) return;
+
     try {
-      const absolute = new URL(url, location.href).href;
-      if (!/^https?:/i.test(absolute)) return;
-      // Ignore tiny tracking pixels and common UI icons where dimensions are known.
-      const w = img?.naturalWidth || img?.width || 0;
-      const h = img?.naturalHeight || img?.height || 0;
-      if (w && h && w < 60 && h < 60) return;
-      found.set(absolute, {
-        url: absolute,
+      const fullURL = new URL(url, location.href).href;
+
+      if (!fullURL.startsWith("http")) return;
+
+      const width =
+        img?.naturalWidth || img?.width || 0;
+
+      const height =
+        img?.naturalHeight || img?.height || 0;
+
+      if (width && height && width < 50 && height < 50) {
+        return;
+      }
+
+      images.set(fullURL, {
+        url: fullURL,
         alt: img?.alt || "",
-        width: w,
-        height: h
+        width,
+        height
       });
-    } catch (_) {}
+
+    } catch (error) {}
   }
 
-  function scan(root = document) {
+  function scanPage(root = document) {
+
     if (root.querySelectorAll) {
+
       root.querySelectorAll("img").forEach(img => {
-        add(img.currentSrc || bestSrcset(img.getAttribute("srcset")) ||
-            img.getAttribute("data-src") || img.getAttribute("src"), img);
-      });
-      root.querySelectorAll("source[srcset]").forEach(source => {
-        const parent = source.closest("picture")?.querySelector("img");
-        add(bestSrcset(source.getAttribute("srcset")), parent);
-      });
-      // Also collect CSS background images from elements.
-      root.querySelectorAll("*").forEach(el => {
-        const bg = getComputedStyle(el).backgroundImage;
-        if (bg && bg !== "none") {
-          for (const match of bg.matchAll(/url\\(["']?(.*?)["']?\\)/g)) add(match[1], null);
+
+        const src =
+          img.currentSrc ||
+          img.getAttribute("src") ||
+          img.getAttribute("data-src") ||
+          img.getAttribute("data-original");
+
+        addImage(src, img);
+
+        const srcset = img.getAttribute("srcset");
+
+        if (srcset) {
+          srcset.split(",").forEach(item => {
+            const url = item.trim().split(/\s+/)[0];
+            addImage(url, img);
+          });
         }
       });
+
+      root.querySelectorAll("[style]").forEach(el => {
+
+        const background =
+          getComputedStyle(el).backgroundImage;
+
+        const matches = background.matchAll(
+          /url\(["']?(.*?)["']?\)/g
+        );
+
+        for (const match of matches) {
+          addImage(match[1], null);
+        }
+
+      });
     }
-    if (root.tagName === "IMG") {
-      const img = root;
-      add(img.currentSrc || img.getAttribute("src"), img);
+
+    if (root.matches?.("img")) {
+      addImage(root.currentSrc || root.src, root);
     }
   }
 
-  scan();
+  scanPage();
+
   const observer = new MutationObserver(records => {
-    for (const record of records) {
-      if (record.type === "attributes") scan(record.target);
-      for (const node of record.addedNodes) {
-        if (node.nodeType === 1) scan(node);
+
+    records.forEach(record => {
+
+      if (record.type === "attributes") {
+        scanPage(record.target);
       }
-    }
+
+      record.addedNodes.forEach(node => {
+        if (node.nodeType === 1) {
+          scanPage(node);
+        }
+      });
+
+    });
+
   });
+
   observer.observe(document.documentElement, {
-    childList: true, subtree: true, attributes: true,
-    attributeFilter: ["src", "srcset", "data-src", "style"]
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: [
+      "src",
+      "srcset",
+      "style",
+      "data-src",
+      "data-original"
+    ]
   });
 
-  // Re-scan after lazy-loaded images update during scrolling.
-  let timer;
   window.addEventListener("scroll", () => {
-    clearTimeout(timer);
-    timer = setTimeout(() => scan(), 250);
-  }, {passive: true});
+    scanPage();
+  }, { passive: true });
 
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message?.type === "GET_COLLECTED_IMAGES") {
-      scan();
-      sendResponse({ images: Array.from(found.values()), count: found.size });
+  chrome.runtime.onMessage.addListener(
+    (message, sender, sendResponse) => {
+
+      if (message.type === "GET_IMAGES") {
+
+        scanPage();
+
+        sendResponse({
+          images: Array.from(images.values()),
+          count: images.size
+        });
+
+      }
+
+      return true;
     }
-    return true;
-  });
+  );
+
 })();
