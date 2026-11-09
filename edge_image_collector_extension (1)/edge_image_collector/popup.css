@@ -1,0 +1,16 @@
+* { box-sizing: border-box; }
+body { margin: 0; width: 390px; max-height: 570px; font: 13px Arial, sans-serif; color: #202124; }
+header { padding: 13px 14px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; }
+header strong { font-size: 15px; }
+#count { color: #555; }
+.hint { margin: 10px 14px; color: #555; line-height: 1.4; }
+.actions { display: flex; gap: 8px; padding: 0 14px 10px; }
+button { border: 1px solid #bbb; background: #fff; border-radius: 5px; padding: 8px 11px; cursor: pointer; }
+button.primary { background: #1769e0; border-color: #1769e0; color: white; flex: 1; }
+main { overflow-y: auto; max-height: 410px; border-top: 1px solid #eee; }
+.item { display: flex; align-items: center; gap: 9px; padding: 8px 12px; border-bottom: 1px solid #eee; }
+.item img { width: 58px; height: 48px; object-fit: cover; background: #f1f1f1; border-radius: 4px; }
+.info { min-width: 0; flex: 1; }
+.name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 600; }
+.meta { color: #666; font-size: 11px; margin-top: 4px; }
+.empty { padding: 18px; color: #666; }

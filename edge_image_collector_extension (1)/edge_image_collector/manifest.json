@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Image Collector - Infinite Scroll",
+  "version": "1.0.0",
+  "description": "Collects images as you scroll a webpage and lets you download them.",
+  "permissions": ["downloads", "activeTab"],
+  "host_permissions": ["<all_urls>"],
+  "action": {"default_popup": "popup.html"},
+  "content_scripts": [{
+    "matches": ["<all_urls>"],
+    "js": ["content.js"],
+    "run_at": "document_idle"
+  }]
+}
